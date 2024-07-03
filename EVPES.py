@@ -208,20 +208,19 @@ df = pd.DataFrame(data)
 # File will be saved as 'NEVC_EVPrices_New.xlsx' with a new sheet named by the current date and time
 
 timestamp = datetime.now().strftime('%d%m%y_%H%M')
+date = datetime.now().strftime('%d%m%y')
 file_name = 'NEVC_EVPrices_New.xlsx'
 sheet_name = f"EV Prices {timestamp}"
 
 # Check if the file exists
 if os.path.exists(file_name):
-    # Append data to the existing file
+    # Load the workbook and get the existing sheets
     book = load_workbook(file_name)
-    with pd.ExcelWriter(file_name, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
-        writer.book = book
+    with pd.ExcelWriter(file_name, engine='openpyxl', mode='a') as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
 else:
     # Create a new file
-    with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    df.to_excel(file_name, index=False, sheet_name=sheet_name)
 
 # Load the workbook to apply formatting
 book = load_workbook(file_name)
@@ -259,7 +258,7 @@ for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=6, max_col=
             cell.font = Font(color='006100')
 
 # Add COE prices information
-sheet['I1'] = "COE Car Prices"
+sheet['I1'] = f"COE Car Prices caa {date}" 
 sheet['I1'].alignment = Alignment(horizontal='center')
 sheet['I1'].font = Font(bold=True)
 sheet['I2'] = 'Cat A (SGD)'
