@@ -2,8 +2,8 @@
 # All rights reserved. This code, in full or in part, is the property of the Land Transport Authority.
 # No part of this code may be disclosed, reproduced, or distributed without prior written permission.
 
-# Last updated: 26/06/2024
-# Ver. 1.2
+# Last updated: 09/07/2024
+# Ver. 1.3
 
 # Electric Vehicle Price Extraction System (EVPES)
 
@@ -63,7 +63,7 @@ for brand_element in brand_elements:
     brand_text = brand_element.text
     brand = brand_text.replace(" cars", "").strip()
     brands.append(brand)
-
+    
 # Main extraction function
 def extract_data(driver):
     # Capture all relevant tables including those with different background colors
@@ -76,8 +76,14 @@ def extract_data(driver):
             model_elements = table.find_elements(By.XPATH, ".//a[contains(@href, 'newcars_overview.php?CarCode=')]/strong")
             for model_element in model_elements:
                 model_name = model_element.text.strip()
-                make = next((brand for brand in brands if brand in model_name), "NIL")
-                model = model_name.replace(make, "").strip() if make != "NIL" else model_name
+                make = next((brand for brand in brands if brand in model_name), None)
+                
+                if make:
+                    model = model_name.replace(make, "").strip()
+                else:
+                    model_elements_split = model_name.split(" ", 1)
+                    make = model_elements_split[0] if len(model_elements_split) > 0 else "Unknown"
+                    model = model_elements_split[1] if len(model_elements_split) > 1 else ""
                 
                 # Extract the specifications and prices
                 spec_elements = table.find_elements(By.XPATH, ".//label")
