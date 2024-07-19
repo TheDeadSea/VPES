@@ -2,10 +2,10 @@
 # All rights reserved. This code, in full or in part, is the property of the Land Transport Authority.
 # No part of this code may be disclosed, reproduced, or distributed without prior written permission.
 
-# Last updated: 09/07/2024
-# Ver. 1.3
+# Last updated: 19/07/2024
+# Ver. 2.0
 
-# Electric Vehicle Price Extraction System (EVPES)
+# New Vehicle Price Extraction System (NVPES)
 
 import time
 import random
@@ -47,6 +47,7 @@ prices = []
 withCOE = []
 coe_cat_list = []
 price_with_coe = []
+vehicle_types = []
 
 # List to store commercial EV models
 commercial_ev_models = []
@@ -63,9 +64,9 @@ for brand_element in brand_elements:
     brand_text = brand_element.text
     brand = brand_text.replace(" cars", "").strip()
     brands.append(brand)
-    
+
 # Main extraction function
-def extract_data(driver):
+def extract_data(driver, vehicle_type, coe_category=None):
     # Capture all relevant tables including those with different background colors
     car_tables = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
     print(f"Found {len(car_tables)} car listings on the page.")
@@ -90,10 +91,10 @@ def extract_data(driver):
                 price_elements = table.find_elements(By.XPATH, ".//td[contains(text(), '$')]")
                 bhp_elements = table.find_elements(By.XPATH, ".//td[contains(text(), 'bhp')]")
                 
-                if not spec_elements or not price_elements or not bhp_elements:
+                if not spec_elements or not price_elements:
                     continue
                 
-                for spec_element, price_element, bhp_element in zip(spec_elements, price_elements, bhp_elements):
+                for spec_element, price_element in zip(spec_elements, price_elements):
                     specification = spec_element.text.strip()
                     price_text = price_element.text.strip()
                     
@@ -109,12 +110,15 @@ def extract_data(driver):
                     
                     main_price = float(main_price)  # Convert to float
 
-                    # Extract bhp
-                    bhp_text = bhp_element.text.strip().replace('bhp', '').strip()
-                    bhp_value = int(bhp_text)
-                    coe_cat = 'A' if bhp_value <= 147 else 'B'
+                    # Extract bhp if the vehicle type is Electric
+                    if vehicle_type == 'Electric':
+                        bhp_text = bhp_elements[0].text.strip().replace('bhp', '').strip()
+                        bhp_value = int(bhp_text)
+                        coe_cat = 'A' if bhp_value <= 147 else 'B'
+                    else:
+                        coe_cat = coe_category
                     
-                    print(f"Extracted make: {make}, model: {model}, specification: {specification}, price: {main_price}, COE: {coe_included}, bhp: {bhp_value}, COE Category: {coe_cat}")
+                    print(f"Extracted make: {make}, model: {model}, specification: {specification}, price: {main_price}, COE: {coe_included}, COE Category: {coe_cat}")
                     
                     # Append the data to the lists
                     makes.append(make)
@@ -123,47 +127,83 @@ def extract_data(driver):
                     prices.append(main_price)
                     withCOE.append(coe_included)
                     coe_cat_list.append(coe_cat)
+                    vehicle_types.append(vehicle_type)
         except Exception as e:
             print(f"Error extracting data: {e}")
 
-# Define URL patterns
-base_url_ev = "https://www.sgcarmart.com/new_cars/newcars_listing.php"
-params_ev = "?BRSR={}&VT=Electric&RPG=60"
-base_url_commercial = "https://www.sgcarmart.com/new_cars/newcars_listing.php?MOD=&PR1=0&PR2=&OMV_C=&DEP1=&DEP2=&FUE=e&DR1=&DR2=&POW_C=&FUEECO_C=&VTS%5B%5D=1&DT=&REGION=&ASL=1"
+# Define URL patterns for different vehicle types
+url_patterns = {
+    'Electric': "?VT=Electric&RPG=60",
+    'Petrol': ["?FUE=p&DT=CoeA&ASL=1&RPG=60", "?FUE=p&DT=CoeB&ASL=1&RPG=60"],
+    'Diesel': ["?FUE=d&DT=CoeA&ASL=1&RPG=60", "?FUE=d&DT=CoeB&ASL=1&RPG=60"],
+    'Petrol-Electric': ["?FUE=r&DT=CoeA&ASL=1&RPG=60", "?FUE=r&DT=CoeB&ASL=1&RPG=60"],
+    'Diesel-Electric': ["?FUE=i&DT=CoeA&ASL=1&RPG=60", "?FUE=i&DT=CoeB&ASL=1&RPG=60"]
+}
 
-items_per_page = 60
-page_limit = 5
+base_url = "https://www.sgcarmart.com/new_cars/newcars_listing.php"
 
-# Scrape EV cars
-for page in range(page_limit):
-    start = page * items_per_page
-    url = base_url_ev + params_ev.format(start)
-    
-    # Load the page
-    driver.get(url)
-    
-    # Wait for the page to fully load
-    time.sleep(5)
-    
-    # Extract data from the current page
-    extract_data(driver)
+# Scrape all vehicle data with dynamic pagination
+def scrape_vehicle_data(base_url, url_patterns):
+    for vehicle_type, params_list in url_patterns.items():
+        if isinstance(params_list, list):
+            for params in params_list:
+                page = 0
+                coe_category = params.split('DT=Coe')[-1][0]  # Extract 'A' or 'B'
+                while True:
+                    start = page * 60
+                    url = f"{base_url}{params}&BRSR={start}"
+                    try:
+                        driver.get(url)
+                        time.sleep(5)
+                        car_elements = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
+                        if not car_elements:
+                            print(f"No data found for {vehicle_type} on page {page}. Stopping.")
+                            break
+                        extract_data(driver, vehicle_type, coe_category)
+                        page += 1
+                    except Exception as e:
+                        print(f"Error scraping data for {vehicle_type} on page {page}: {e}")
+                        break
+        else:
+            page = 0
+            while True:
+                start = page * 60
+                url = f"{base_url}{params_list}&BRSR={start}"
+                try:
+                    driver.get(url)
+                    time.sleep(5)
+                    car_elements = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
+                    if not car_elements:
+                        print(f"No data found for {vehicle_type} on page {page}. Stopping.")
+                        break
+                    extract_data(driver, vehicle_type)
+                    page += 1
+                except Exception as e:
+                    print(f"Error scraping data for {vehicle_type} on page {page}: {e}")
+                    break
 
 # Scrape commercial EV cars
 def extract_commercial_ev_data(driver):
-    car_tables = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
-    for table in car_tables:
-        try:
-            model_elements = table.find_elements(By.XPATH, ".//a[contains(@href, 'newcars_overview.php?CarCode=')]/strong")
-            for model_element in model_elements:
-                model_name = model_element.text.strip()
-                make, model = model_name.split(' ', 1)
-                commercial_ev_models.append(model)
-        except Exception as e:
-            print(f"Error extracting commercial EV data: {e}")
-
-driver.get(base_url_commercial)
-time.sleep(5)
-extract_commercial_ev_data(driver)
+    page = 0
+    while True:
+        start = page * 60
+        url = f"https://www.sgcarmart.com/new_cars/newcars_listing.php?BRSR={start}&FUE=&VTS%5B%5D=1&RPG=60"
+        driver.get(url)
+        time.sleep(5)
+        car_tables = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
+        if not car_tables:
+            print(f"No more commercial EV data found on page {page}. Stopping.")
+            break
+        for table in car_tables:
+            try:
+                model_elements = table.find_elements(By.XPATH, ".//a[contains(@href, 'newcars_overview.php?CarCode=')]/strong")
+                for model_element in model_elements:
+                    model_name = model_element.text.strip()
+                    make, model = model_name.split(' ', 1)
+                    commercial_ev_models.append(model)
+            except Exception as e:
+                print(f"Error extracting commercial EV data: {e}")
+        page += 1
 
 # Scrape COE prices
 def extract_coe_prices(driver):
@@ -172,16 +212,27 @@ def extract_coe_prices(driver):
     time.sleep(5)
 
     try:
+        coe_month_year = driver.find_element(By.XPATH, "/html/body/main/div/div[1]/div/div[1]/div/div[1]/div[1]/div/h2/span[2]").text
+        coe_bidding = driver.find_element(By.XPATH, "/html/body/main/div/div[1]/div/div[1]/div/div[1]/div[1]/div/p").text
+        coe_label = f"{coe_month_year} {coe_bidding}"
+
         coe_price_a = driver.find_element(By.XPATH, "/html/body/main/div/div[1]/div/div[1]/div/div[2]/table/tbody/tr[2]/td[2]/p").text.replace('$', '').replace(',', '')
         coe_price_b = driver.find_element(By.XPATH, "/html/body/main/div/div[1]/div/div[1]/div/div[2]/table/tbody/tr[2]/td[3]/p").text.replace('$', '').replace(',', '')
         coe_price_c = driver.find_element(By.XPATH, "/html/body/main/div/div[1]/div/div[1]/div/div[2]/table/tbody/tr[2]/td[4]/p").text.replace('$', '').replace(',', '')
         
-        return float(coe_price_a), float(coe_price_b), float(coe_price_c)
+        return coe_label, float(coe_price_a), float(coe_price_b), float(coe_price_c)
     except Exception as e:
         print(f"Error extracting COE prices: {e}")
-        return None, None, None
+        return None, None, None, None
 
-coe_price_a, coe_price_b, coe_price_c = extract_coe_prices(driver)
+# Perform scraping
+scrape_vehicle_data(base_url, url_patterns)
+
+# Scrape commercial vehicles
+extract_commercial_ev_data(driver)
+
+# Get COE prices
+coe_label, coe_price_a, coe_price_b, coe_price_c = extract_coe_prices(driver)
 
 # Update COE category to 'C' if model appears in both lists
 for i, model in enumerate(models):
@@ -200,6 +251,7 @@ for i in range(len(prices)):
         elif coe_cat_list[i] == 'C':
             price_with_coe.append(prices[i] + coe_price_c)
 
+# Create DataFrame
 data = {
     'Make': makes,
     'Model': models,
@@ -207,15 +259,14 @@ data = {
     'Price (From SGCarMart)': prices,
     'With COE': withCOE,
     'COE Category': coe_cat_list,
-    'Price with COE (SGD)': price_with_coe
+    'Price with COE (SGD)': price_with_coe,
+    'Vehicle Type': vehicle_types
 }
 df = pd.DataFrame(data)
 
-# File will be saved as 'NEVC_EVPrices_New.xlsx' with a new sheet named by the current date and time
-
+# File will be saved as 'NEVC_Prices_New.xlsx' with a new sheet named by the current date and time
 timestamp = datetime.now().strftime('%d%m%y_%H%M')
-date = datetime.now().strftime('%d%m%y')
-file_name = 'NEVC_EVPrices_New.xlsx'
+file_name = 'NEVC_Prices_New.xlsx'
 sheet_name = f"EV Prices {timestamp}"
 
 # Check if the file exists
@@ -264,7 +315,7 @@ for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=6, max_col=
             cell.font = Font(color='006100')
 
 # Add COE prices information
-sheet['I1'] = f"COE Car Prices caa {date}" 
+sheet['I1'] = f"COE Car Prices as of {coe_label}" 
 sheet['I1'].alignment = Alignment(horizontal='center')
 sheet['I1'].font = Font(bold=True)
 sheet['I2'] = 'Cat A (SGD)'
