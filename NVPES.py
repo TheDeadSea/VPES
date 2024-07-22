@@ -49,8 +49,8 @@ coe_cat_list = []
 price_with_coe = []
 vehicle_types = []
 
-# List to store commercial EV models
-commercial_ev_models = []
+# List to store commercial vehicle models
+commercial_models = []
 
 # Step 1: Scrape car brands
 url = "https://www.sgcarmart.com/new_cars/newcars_brand_landing.php"
@@ -182,8 +182,8 @@ def scrape_vehicle_data(base_url, url_patterns):
                     print(f"Error scraping data for {vehicle_type} on page {page}: {e}")
                     break
 
-# Scrape commercial EV cars
-def extract_commercial_ev_data(driver):
+# Scrape commercial cars
+def extract_commercial_data(driver):
     page = 0
     while True:
         start = page * 60
@@ -192,7 +192,7 @@ def extract_commercial_ev_data(driver):
         time.sleep(5)
         car_tables = driver.find_elements(By.XPATH, "//table[@width='100%' and (@bgcolor='#FFFFFF' or @bgcolor='#F6FDFF')]")
         if not car_tables:
-            print(f"No more commercial EV data found on page {page}. Stopping.")
+            print(f"No more commercial vehicle data found on page {page}. Stopping.")
             break
         for table in car_tables:
             try:
@@ -200,9 +200,9 @@ def extract_commercial_ev_data(driver):
                 for model_element in model_elements:
                     model_name = model_element.text.strip()
                     make, model = model_name.split(' ', 1)
-                    commercial_ev_models.append(model)
+                    commercial_models.append(model)
             except Exception as e:
-                print(f"Error extracting commercial EV data: {e}")
+                print(f"Error extracting commercial vehicle data: {e}")
         page += 1
 
 # Scrape COE prices
@@ -229,14 +229,14 @@ def extract_coe_prices(driver):
 scrape_vehicle_data(base_url, url_patterns)
 
 # Scrape commercial vehicles
-extract_commercial_ev_data(driver)
+extract_commercial_data(driver)
 
 # Get COE prices
 coe_label, coe_price_a, coe_price_b, coe_price_c = extract_coe_prices(driver)
 
 # Update COE category to 'C' if model appears in both lists
 for i, model in enumerate(models):
-    if model in commercial_ev_models:
+    if model in commercial_models:
         coe_cat_list[i] = 'C'
 
 # Calculate 'Price with COE'
