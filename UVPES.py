@@ -77,11 +77,16 @@ def scrape_car_details(link, brands, max_retries=3):
             
             page_source = driver.page_source
             soup = BeautifulSoup(page_source, 'html.parser')
-            
+
             # Extract make and model
             make_model = soup.find('a', class_='nounderline globaltitle').text.strip()
-            make = next((brand for brand in brands if brand in make_model), "NIL")
-            model = make_model.replace(make, "").strip() if make != "NIL" else make_model
+            make = next((brand for brand in brands if brand in make_model), None)
+                if make:
+                    model = make_model.replace(make, "").strip()
+                else:
+                make_model_split = make_model.split(" ", 1)
+                make = make_model_split[0] if len(make_model_split) > 0 else "Unknown"
+                model = make_model_split[1] if len(make_model_split) > 1 else ""
             
             # Initialize a dictionary to hold the car details
             data = {
