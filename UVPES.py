@@ -81,9 +81,9 @@ def scrape_car_details(link, brands, max_retries=3):
             # Extract make and model
             make_model = soup.find('a', class_='nounderline globaltitle').text.strip()
             make = next((brand for brand in brands if brand in make_model), None)
-                if make:
+            if make:
                     model = make_model.replace(make, "").strip()
-                else:
+            else:
                 make_model_split = make_model.split(" ", 1)
                 make = make_model_split[0] if len(make_model_split) > 0 else "Unknown"
                 model = make_model_split[1] if len(make_model_split) > 1 else ""
