@@ -199,7 +199,14 @@ def extract_commercial_data(driver):
                 model_elements = table.find_elements(By.XPATH, ".//a[contains(@href, 'newcars_overview.php?CarCode=')]/strong")
                 for model_element in model_elements:
                     model_name = model_element.text.strip()
-                    make, model = model_name.split(' ', 1)
+                    make = next((brand for brand in brands if brand in model_name), None)
+                    if make:
+                        model = model_name.replace(make, "").strip()
+                    else:
+                        model_elements_split = model_name.split(" ", 1)
+                        make = model_elements_split[0] if len(model_elements_split) > 0 else "Unknown"
+                        model = model_elements_split[1] if len(model_elements_split) > 1 else "
+                        
                     commercial_models.append(model)
             except Exception as e:
                 print(f"Error extracting commercial vehicle data: {e}")
