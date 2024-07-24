@@ -77,24 +77,18 @@ def extract_data(driver, vehicle_type, coe_category=None):
             model_elements = table.find_elements(By.XPATH, ".//a[contains(@href, 'newcars_overview.php?CarCode=')]/strong")
             for model_element in model_elements:
                 model_name = model_element.text.strip()
-                make = next((brand for brand in brands if brand in model_name), None)
-                
-                if make:
-                    model = model_name.replace(make, "").strip()
-                else:
-                    model_elements_split = model_name.split(" ", 1)
-                    make = model_elements_split[0] if len(model_elements_split) > 0 else "Unknown"
-                    model = model_elements_split[1] if len(model_elements_split) > 1 else ""
+                make = next((brand for brand in brands if brand in model_name), "NIL")
+                model = model_name.replace(make, "").strip() if make != "NIL" else model_name
                 
                 # Extract the specifications and prices
                 spec_elements = table.find_elements(By.XPATH, ".//label")
                 price_elements = table.find_elements(By.XPATH, ".//td[contains(text(), '$')]")
                 bhp_elements = table.find_elements(By.XPATH, ".//td[contains(text(), 'bhp')]")
                 
-                if not spec_elements or not price_elements:
+                if not spec_elements or not price_elements or not bhp_elements:
                     continue
                 
-                for spec_element, price_element in zip(spec_elements, price_elements):
+                for spec_element, price_element, bhp_element in zip(spec_elements, price_elements, bhp_elements):
                     specification = spec_element.text.strip()
                     price_text = price_element.text.strip()
                     
@@ -110,15 +104,17 @@ def extract_data(driver, vehicle_type, coe_category=None):
                     
                     main_price = float(main_price)  # Convert to float
 
-                    # Extract bhp if the vehicle type is Electric
-                    if vehicle_type == 'Electric':
-                        bhp_text = bhp_elements[0].text.strip().replace('bhp', '').strip()
-                        bhp_value = int(bhp_text)
-                        coe_cat = 'A' if bhp_value <= 147 else 'B'
-                    else:
-                        coe_cat = coe_category
+                    # Extract bhp
+                    bhp_text = bhp_element.text.strip().replace('bhp', '').strip()
+                    bhp_value = int(bhp_text)
                     
-                    print(f"Extracted make: {make}, model: {model}, specification: {specification}, price: {main_price}, COE: {coe_included}, COE Category: {coe_cat}")
+                    # Determine COE category based on vehicle type
+                    if vehicle_type in ['Petrol', 'Diesel', 'Petrol-Electric', 'Diesel-Electric']:
+                        coe_cat = coe_category
+                    elif vehicle_type == 'Electric':
+                        coe_cat = 'A' if bhp_value <= 147 else 'B'
+                    
+                    print(f"Extracted make: {make}, model: {model}, specification: {specification}, price: {main_price}, COE: {coe_included}, bhp: {bhp_value}, COE Category: {coe_cat}")
                     
                     # Append the data to the lists
                     makes.append(make)
